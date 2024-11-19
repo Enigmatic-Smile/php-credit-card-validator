@@ -144,7 +144,7 @@ class CreditCard
         }
     }
 
-    public function validCreditCard($number, $types = [])
+    public function validCreditCard($number, $types = []): array
     {
         $ret = [
             'valid'  => false,
@@ -176,12 +176,12 @@ class CreditCard
         return $ret;
     }
 
-    public function validCvc($cvc, $type)
+    public function validCvc($cvc, $type): bool
     {
         return (ctype_digit($cvc) && array_key_exists($type, $this->cards) && $this->validCvcLength($cvc, $type));
     }
 
-    public function validDate($year, $month)
+    public function validDate($year, $month): bool
     {
         $month = str_pad($month, 2, '0', STR_PAD_LEFT);
 
@@ -219,12 +219,12 @@ class CreditCard
         return '';
     }
 
-    protected function validCard($number, $type)
+    protected function validCard($number, $type): bool
     {
         return $this->validCardNumber($number, $type) && $this->validLength($number, $type) && $this->validLuhn($number, $type);
     }
 
-    protected function validCardNumber($number, $type)
+    protected function validCardNumber($number, $type): bool
     {
         try {
             $inCache = $this->cache->has($number);
@@ -235,7 +235,7 @@ class CreditCard
         return $inCache || (isset($this->cards[$type]) && array_key_exists('pattern', $this->cards[$type]) && preg_match($this->cards[$type]['pattern'], $number));
     }
 
-    protected function validLength($number, $type)
+    protected function validLength($number, $type): bool
     {
         foreach ($this->cards[$type]['length'] as $length) {
             if (strlen($number) == $length) {
@@ -246,7 +246,7 @@ class CreditCard
         return false;
     }
 
-    protected function validCvcLength($cvc, $type)
+    protected function validCvcLength($cvc, $type): bool
     {
         foreach ($this->cards[$type]['cvcLength'] as $length) {
             if (strlen($cvc) == $length) {
@@ -257,7 +257,7 @@ class CreditCard
         return false;
     }
 
-    protected function validLuhn($number, $type)
+    protected function validLuhn($number, $type): bool
     {
         if (!$this->cards[$type]['luhn']) {
             return true;
@@ -266,7 +266,7 @@ class CreditCard
         }
     }
 
-    protected function luhnCheck($number)
+    protected function luhnCheck($number): bool
     {
         $checksum = 0;
         for ($i = (2 - (strlen($number) % 2)); $i <= strlen($number); $i += 2) {
