@@ -13,7 +13,7 @@ class SimpleCache implements CacheInterface
         $this->store = $store;
     }
 
-    public function get(string $key, mixed $default = null): mixed
+    public function get($key, $default = null)
     {
         if (!array_key_exists($this->transformKey($key), $this->store)) {
             return $default;
@@ -22,25 +22,25 @@ class SimpleCache implements CacheInterface
         return $this->store[$this->transformKey($key)];
     }
 
-    public function set(string $key, mixed $value, \DateInterval|int|null $ttl = null): bool
+    public function set($key, $value, $ttl = null)
     {
         $this->store[$this->transformKey($key)] = $value;
         return true;
     }
 
-    public function delete(string $key): bool
+    public function delete($key)
     {
         unset($this->store[$this->transformKey($key)]);
         return true;
     }
 
-    public function clear(): bool
+    public function clear()
     {
         $this->store = [];
         return true;
     }
 
-    public function getMultiple(iterable $keys, mixed $default = null): iterable
+    public function getMultiple($keys, $default = null)
     {
         $returns = [];
         foreach ($keys as $key) {
@@ -55,7 +55,7 @@ class SimpleCache implements CacheInterface
         return $returns;
     }
 
-    public function setMultiple(iterable $values, \DateInterval|int|null $ttl = null): bool
+    public function setMultiple($values, $ttl = null)
     {
         foreach ($values as $key => $value) {
             $this->set($this->transformKey($key), $value, $ttl);
@@ -64,7 +64,7 @@ class SimpleCache implements CacheInterface
         return true;
     }
 
-    public function deleteMultiple(iterable $keys): bool
+    public function deleteMultiple($keys)
     {
         foreach ($keys as $key) {
             $this->delete($this->transformKey($key));
@@ -73,12 +73,12 @@ class SimpleCache implements CacheInterface
         return true;
     }
 
-    public function has(string $key): bool
+    public function has($key)
     {
         return array_key_exists($this->transformKey($key), $this->store);
     }
 
-    private function transformKey(string $key): string {
+    private function transformKey($key) {
         return substr($key, 0, 6);
     }
 }
