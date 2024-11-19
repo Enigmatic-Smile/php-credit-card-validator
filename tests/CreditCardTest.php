@@ -13,7 +13,7 @@ class CreditCardTest extends TestCase
     // Card numbers of Visa Electron, Maestro and Dankort taken from:
     // http://support.worldpay.com/support/kb/bg/testandgolive/tgl5103.html
 
-    protected $validCards = [
+    protected array $validCards = [
 
         // Debit cards
         CreditCard::TYPE_VISA_ELECTRON => [
@@ -92,15 +92,28 @@ class CreditCardTest extends TestCase
             '4389351648020055',
             '6362970000457013',
         ],
+        'testCard' => [
+            '1234567891234567',
+            '4567891234567891',
+        ],
     ];
 
     private ?CreditCard $creditCard;
 
     protected function setUp(): void
     {
-        $cache = new SimpleCache();
+        $fixture = parse_ini_file(__DIR__ . '/fixture.ini', true);
 
-        $this->creditCard = new CreditCard($cache, []);
+        $store = [];
+        foreach ($fixture['ranges']['binRange'] as $binRange) {
+            $store[$binRange] = $fixture['config']['type'];
+        }
+
+        $cache = new SimpleCache($store);
+
+        $this->creditCard = new CreditCard($cache, [
+            $fixture['config'],
+        ]);
     }
 
     protected function tearDown(): void
@@ -114,7 +127,7 @@ class CreditCardTest extends TestCase
             foreach ($numbers as $number) {
                 $result = $this->creditCard->validCreditCard($number);
 
-                $this->assertEquals(true, $result['valid'], 'Invalid card, expected valid. Type: ' . $type . ', Number: ' . $number);
+                $this->assertTrue($result['valid'], 'Invalid card, expected valid. Type: ' . $type . ', Number: ' . $number);
                 $this->assertEquals($type, $result['type'], 'Invalid type. Number: ' . $number . ', Expected: ' . $type . ', Actual: ' . $result['type']);
             }
         }
@@ -124,102 +137,102 @@ class CreditCardTest extends TestCase
     {
         // Empty number
         $result = $this->creditCard->validCreditCard('');
-        $this->assertEquals(false, $result['valid']);
+        $this->assertFalse($result['valid']);
 
         // Number with spaces
         $result = $this->creditCard->validCreditCard('       ');
-        $this->assertEquals(false, $result['valid']);
+        $this->assertFalse($result['valid']);
 
         // Valid number
         $result = $this->creditCard->validCreditCard('4242424242424242');
-        $this->assertEquals(true, $result['valid']);
+        $this->assertTrue($result['valid']);
 
         // Valid number with dashes
         $result = $this->creditCard->validCreditCard('4242-4242-4242-4242');
-        $this->assertEquals(true, $result['valid']);
+        $this->assertTrue($result['valid']);
 
         // Valid number with spaces
         $result = $this->creditCard->validCreditCard('4242 4242 4242 4242');
-        $this->assertEquals(true, $result['valid']);
+        $this->assertTrue($result['valid']);
 
         // More than 16 digits
         $result = $this->creditCard->validCreditCard('42424242424242424');
-        $this->assertEquals(false, $result['valid']);
+        $this->assertFalse($result['valid']);
 
         // Less than 10 digits
         $result = $this->creditCard->validCreditCard('424242424');
-        $this->assertEquals(false, $result['valid']);
+        $this->assertFalse($result['valid']);
 
         // Valid predefined card type
         $result = $this->creditCard->validCreditCard('4242424242424242', CreditCard::TYPE_VISA);
-        $this->assertEquals(true, $result['valid']);
+        $this->assertTrue($result['valid']);
 
         // Valid among predefined card types
         $result = $this->creditCard->validCreditCard('4242424242424242', [CreditCard::TYPE_MASTERCARD, CreditCard::TYPE_VISA]);
-        $this->assertEquals(true, $result['valid']);
+        $this->assertTrue($result['valid']);
 
         // Invalid any of predefined card types
         $result = $this->creditCard->validCreditCard('4242424242424242', [CreditCard::TYPE_MASTERCARD, CreditCard::TYPE_VISA_ELECTRON]);
-        $this->assertEquals(false, $result['valid']);
+        $this->assertFalse($result['valid']);
     }
 
     public function testLuhn()
     {
         $result = $this->creditCard->validCreditCard('4242424242424241');
-        $this->assertEquals(false, $result['valid']);
+        $this->assertFalse($result['valid']);
     }
 
     public function testDate()
     {
         // Invalid month
-        $this->assertEquals(false, $this->creditCard->validDate(date('Y'), '13'));
+        $this->assertFalse($this->creditCard->validDate(date('Y'), '13'));
 
         // Invalid year
-        $this->assertEquals(false, $this->creditCard->validDate(date('Y'), '15'));
+        $this->assertFalse($this->creditCard->validDate(date('Y'), '15'));
 
         // Integer values
-        $this->assertEquals(true, $this->creditCard->validDate(intval(date('Y')), intval(date('m'))));
+        $this->assertTrue($this->creditCard->validDate(intval(date('Y')), intval(date('m'))));
 
         // Not numbers
-        $this->assertEquals(false, $this->creditCard->validDate('j201', 'd4'));
+        $this->assertFalse($this->creditCard->validDate('j201', 'd4'));
 
         // Past year, future month
         $timestamp = strtotime('-1 month');
-        $this->assertEquals(false, $this->creditCard->validDate(date('Y', $timestamp) - 1, date('m', $timestamp)));
+        $this->assertFalse($this->creditCard->validDate(date('Y', $timestamp) - 1, date('m', $timestamp)));
 
         // Current year, past month
         $timestamp = strtotime('-1 month');
-        $this->assertEquals(false, $this->creditCard->validDate(date('Y', $timestamp), date('m', $timestamp)));
+        $this->assertFalse($this->creditCard->validDate(date('Y', $timestamp), date('m', $timestamp)));
 
         // Current year, current month
-        $this->assertEquals(true, $this->creditCard->validDate(date('Y'), date('m')));
+        $this->assertTrue($this->creditCard->validDate(date('Y'), date('m')));
 
         // Next year
         $timestamp = strtotime('+1 year');
-        $this->assertEquals(true, $this->creditCard->validDate(date('Y', $timestamp), date('m', $timestamp)));
+        $this->assertTrue($this->creditCard->validDate(date('Y', $timestamp), date('m', $timestamp)));
     }
 
     public function testCvc()
     {
         // Empty
-        $this->assertEquals(false, $this->creditCard->validCvc('', ''));
+        $this->assertFalse($this->creditCard->validCvc('', ''));
 
         // Empty type
-        $this->assertEquals(false, $this->creditCard->validCvc('123', ''));
+        $this->assertFalse($this->creditCard->validCvc('123', ''));
 
         // Empty number
-        $this->assertEquals(false, $this->creditCard->validCvc('', CreditCard::TYPE_VISA));
+        $this->assertFalse($this->creditCard->validCvc('', CreditCard::TYPE_VISA));
 
         // Valid
-        $this->assertEquals(true, $this->creditCard->validCvc('123', CreditCard::TYPE_VISA));
+        $this->assertTrue($this->creditCard->validCvc('123', CreditCard::TYPE_VISA));
 
         // Non digits
-        $this->assertEquals(false, $this->creditCard->validCvc('12e', CreditCard::TYPE_VISA));
+        $this->assertFalse($this->creditCard->validCvc('12e', CreditCard::TYPE_VISA));
 
         // Less than 3 digits
-        $this->assertEquals(false, $this->creditCard->validCvc('12', CreditCard::TYPE_VISA));
+        $this->assertFalse($this->creditCard->validCvc('12', CreditCard::TYPE_VISA));
 
         // More than 3 digits
-        $this->assertEquals(false, $this->creditCard->validCvc('1234', CreditCard::TYPE_VISA));
+        $this->assertFalse($this->creditCard->validCvc('1234', CreditCard::TYPE_VISA));
     }
 }

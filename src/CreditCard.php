@@ -132,11 +132,15 @@ class CreditCard
         ],
     ];
 
+    /**
+     * @param CacheInterface $cache
+     * @param array{type: string, pattern: string, format: string, length: int[], cvcLength: int[], luhn: bool} $absoluteConfigs
+     */
     public function __construct(CacheInterface $cache, array $absoluteConfigs) {
         $this->cache = $cache;
 
-        foreach ($absoluteConfigs as $type => $config) {
-            $this->cards[$type] = $config;
+        foreach ($absoluteConfigs as $config) {
+            $this->cards[$config['type']] = $config;
         }
     }
 
@@ -202,12 +206,12 @@ class CreditCard
         try {
             $absolute = $this->cache->get($number);
             if ($absolute != null) {
-                return $absolute['type'];
+                return $absolute;
             }
         } catch (InvalidArgumentException $e) {}
 
         foreach ($this->cards as $type => $card) {
-            if (preg_match($card['pattern'], $number)) {
+            if (array_key_exists('pattern', $card) && preg_match($card['pattern'], $number)) {
                 return $type;
             }
         }
@@ -228,7 +232,7 @@ class CreditCard
             $inCache = false;
         }
 
-        return $inCache || (isset($this->cards[$type]) && preg_match($this->cards[$type]['pattern'], $number));
+        return $inCache || (isset($this->cards[$type]) && array_key_exists('pattern', $this->cards[$type]) && preg_match($this->cards[$type]['pattern'], $number));
     }
 
     protected function validLength($number, $type)
