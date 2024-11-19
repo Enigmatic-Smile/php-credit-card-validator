@@ -25,7 +25,8 @@
     "require": {
         "php": ">=8",
         "lib-pcre": ">=8.38",
-        "ext-ctype": "*"
+        "ext-ctype": "*",
+        "psr/simple-cache": "^3.0"
     },
     "require-dev": {
         "phpunit/phpunit": "^11"
@@ -33,6 +34,11 @@
     "autoload": {
         "psr-4": {
             "Freelancehunt\\Validators\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Freelancehunt\\Validators\\Tests\\": "tests/"
         }
     }
 }

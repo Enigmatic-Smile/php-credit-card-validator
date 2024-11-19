@@ -2,6 +2,9 @@
 
 namespace Freelancehunt\Validators;
 
+use Psr\SimpleCache\CacheInterface;
+use Psr\SimpleCache\InvalidArgumentException;
+
 /**
  * Class CreditCard.
  * Validates popular debit and credit cards' numbers against regular expressions and Luhn algorithm.
@@ -28,7 +31,10 @@ class CreditCard
     public const TYPE_HIPERCARD          = 'hipercard';
     public const TYPE_ELO                = 'elo';
 
-    protected static $cards = [
+    private CacheInterface $cache;
+
+    /* @var array<string, array{type: string, pattern: string, format: string, length: int[], cvcLength: int[], luhn: bool}> */
+    protected array $cards = [
         // Debit cards must come first, since they have more specific patterns than their credit-card equivalents.
         self::TYPE_ELO               => [ // Should be higher then maestro cards detector
             'type'      => self::TYPE_ELO,
@@ -126,7 +132,15 @@ class CreditCard
         ],
     ];
 
-    public static function validCreditCard($number, $types = [])
+    public function __construct(CacheInterface $cache, array $absoluteConfigs) {
+        $this->cache = $cache;
+
+        foreach ($absoluteConfigs as $type => $config) {
+            $this->cards[$type] = $config;
+        }
+    }
+
+    public function validCreditCard($number, $types = [])
     {
         $ret = [
             'valid'  => false,
@@ -142,11 +156,11 @@ class CreditCard
         $number = preg_replace('/[^0-9]/', '', $number);
 
         if (empty($types)) {
-            $types[] = self::creditCardType($number);
+            $types[] = $this->creditCardType($number);
         }
 
         foreach ($types as $type) {
-            if (isset(self::$cards[$type]) && self::validCard($number, $type)) {
+            if ($this->validCard($number, $type)) {
                 return [
                     'valid'  => true,
                     'number' => $number,
@@ -158,12 +172,12 @@ class CreditCard
         return $ret;
     }
 
-    public static function validCvc($cvc, $type)
+    public function validCvc($cvc, $type)
     {
-        return (ctype_digit($cvc) && array_key_exists($type, self::$cards) && self::validCvcLength($cvc, $type));
+        return (ctype_digit($cvc) && array_key_exists($type, $this->cards) && $this->validCvcLength($cvc, $type));
     }
 
-    public static function validDate($year, $month)
+    public function validDate($year, $month)
     {
         $month = str_pad($month, 2, '0', STR_PAD_LEFT);
 
@@ -183,9 +197,16 @@ class CreditCard
         return true;
     }
 
-    protected static function creditCardType($number)
+    protected function creditCardType($number): string
     {
-        foreach (self::$cards as $type => $card) {
+        try {
+            $absolute = $this->cache->get($number);
+            if ($absolute != null) {
+                return $absolute['type'];
+            }
+        } catch (InvalidArgumentException $e) {}
+
+        foreach ($this->cards as $type => $card) {
             if (preg_match($card['pattern'], $number)) {
                 return $type;
             }
@@ -194,19 +215,25 @@ class CreditCard
         return '';
     }
 
-    protected static function validCard($number, $type)
+    protected function validCard($number, $type)
     {
-        return (self::validPattern($number, $type) && self::validLength($number, $type) && self::validLuhn($number, $type));
+        return $this->validCardNumber($number, $type) && $this->validLength($number, $type) && $this->validLuhn($number, $type);
     }
 
-    protected static function validPattern($number, $type)
+    protected function validCardNumber($number, $type)
     {
-        return preg_match(self::$cards[$type]['pattern'], $number);
+        try {
+            $inCache = $this->cache->has($number);
+        } catch (InvalidArgumentException $e) {
+            $inCache = false;
+        }
+
+        return $inCache || (isset($this->cards[$type]) && preg_match($this->cards[$type]['pattern'], $number));
     }
 
-    protected static function validLength($number, $type)
+    protected function validLength($number, $type)
     {
-        foreach (self::$cards[$type]['length'] as $length) {
+        foreach ($this->cards[$type]['length'] as $length) {
             if (strlen($number) == $length) {
                 return true;
             }
@@ -215,9 +242,9 @@ class CreditCard
         return false;
     }
 
-    protected static function validCvcLength($cvc, $type)
+    protected function validCvcLength($cvc, $type)
     {
-        foreach (self::$cards[$type]['cvcLength'] as $length) {
+        foreach ($this->cards[$type]['cvcLength'] as $length) {
             if (strlen($cvc) == $length) {
                 return true;
             }
@@ -226,16 +253,16 @@ class CreditCard
         return false;
     }
 
-    protected static function validLuhn($number, $type)
+    protected function validLuhn($number, $type)
     {
-        if (!self::$cards[$type]['luhn']) {
+        if (!$this->cards[$type]['luhn']) {
             return true;
         } else {
-            return self::luhnCheck($number);
+            return $this->luhnCheck($number);
         }
     }
 
-    protected static function luhnCheck($number)
+    protected function luhnCheck($number)
     {
         $checksum = 0;
         for ($i = (2 - (strlen($number) % 2)); $i <= strlen($number); $i += 2) {
